@@ -1,0 +1,181 @@
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #e6f4ff 0%, #f6fbff 100%);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 16px;
+  color: #0f2b46;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-root {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-layout {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 24px 28px;
+  box-sizing: border-box;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px 24px;
+  box-shadow: 0 6px 18px rgba(48, 98, 168, 0.12);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  align-items: stretch;
+}
+
+.app-block {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.app-block-centered {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.app-block-centered > * {
+  width: 100%;
+  max-width: 720px;
+}
+
+.app-actions-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.decor-left-cloud,
+.decor-right-cloud {
+  color: #8cc8ff;
+  font-size: 24px;
+}
+
+.decor-left-cloud {
+  margin-right: 6px;
+}
+
+.decor-right-cloud {
+  margin-left: 6px;
+}
+
+.ant-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dense-table.ant-table-wrapper,
+.dense-table .ant-spin-nested-loading,
+.dense-table .ant-spin-container,
+.dense-table .ant-table-container {
+  max-width: 100%;
+}
+
+.dense-table .ant-table-cell {
+  padding: 5px 6px !important;
+  font-size: 13px;
+  vertical-align: top;
+  word-break: break-word;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+.dense-table .ant-table-tbody > tr > td {
+  min-width: 52px;
+  max-width: 220px;
+}
+
+.dense-table .ant-table-thead > tr > th {
+  min-width: 52px;
+  max-width: 220px;
+  word-break: break-word;
+}
+
+/* Controls inside workload table cells: fill cell, не вылезают */
+.dense-table .ant-table-cell .ant-input,
+.dense-table .ant-table-cell .ant-input-affix-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.dense-table .ant-table-cell .ant-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.dense-table .ant-table-cell .ant-select .ant-select-selector {
+  box-sizing: border-box;
+}
+
+.dense-table .ant-table-cell .ant-input-number {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.dense-table .ant-table-cell .ant-input-number .ant-input-number-input-wrap {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dense-table .ant-table-cell .ant-input-number-input {
+  box-sizing: border-box;
+}
+
+.role-selection-buttons {
+  width: 100%;
+  justify-content: center !important;
+}
+
+.role-selection-buttons .ant-space-item {
+  flex-shrink: 0;
+}
+
+.teacher-table-toolbar {
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
