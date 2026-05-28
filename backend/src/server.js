@@ -1,11 +1,109 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
 const PORT = 4000;
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, "..", "data.sqlite");
+
+const db = new sqlite3.Database(DB_PATH);
+
+const run = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.run(sql, params, function onRun(error) {
+      if (error) return reject(error);
+      return resolve(this);
+    });
+  });
+
+const get = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.get(sql, params, (error, row) => {
+      if (error) return reject(error);
+      return resolve(row);
+    });
+  });
 
 app.use(cors());
 app.use(express.json());
+
+const defaultExcelState = {
+  initializedFromExcel: false,
+  teachers: [],
+  disciplines: [],
+  faculties: [],
+  assignments: [],
+  workloads: [],
+  workTypes: [],
+};
+
+const isArrayOrDefault = (value) => (Array.isArray(value) ? value : []);
+
+const sanitizeExcelState = (rawState) => ({
+  initializedFromExcel: Boolean(rawState?.initializedFromExcel),
+  teachers: isArrayOrDefault(rawState?.teachers),
+  disciplines: isArrayOrDefault(rawState?.disciplines),
+  faculties: isArrayOrDefault(rawState?.faculties),
+  assignments: isArrayOrDefault(rawState?.assignments),
+  workloads: isArrayOrDefault(rawState?.workloads),
+  workTypes: isArrayOrDefault(rawState?.workTypes),
+});
+
+const initDb = async () => {
+  await run(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      data TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+};
+
+const loadExcelState = async () => {
+  const row = await get("SELECT data FROM app_state WHERE id = 1");
+  if (!row?.data) return null;
+
+  try {
+    return sanitizeExcelState(JSON.parse(row.data));
+  } catch {
+    return null;
+  }
+};
+
+const saveExcelState = async (state) => {
+  const payload = JSON.stringify(sanitizeExcelState(state));
+  const updatedAt = new Date().toISOString();
+  await run(
+    `
+      INSERT INTO app_state (id, data, updated_at)
+      VALUES (1, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        data = excluded.data,
+        updated_at = excluded.updated_at
+    `,
+    [payload, updatedAt]
+  );
+};
+
+app.get("/state", async (_req, res) => {
+  try {
+    const state = (await loadExcelState()) || defaultExcelState;
+    return res.json({ state });
+  } catch (error) {
+    return res.status(500).json({ message: "Cannot load state from database." });
+  }
+});
+
+app.put("/state", async (req, res) => {
+  try {
+    const nextState = sanitizeExcelState(req.body?.state);
+    await saveExcelState(nextState);
+    return res.json({ message: "State saved" });
+  } catch (error) {
+    return res.status(500).json({ message: "Cannot save state to database." });
+  }
+});
 
 const teachers = [
   { id: "ivanova-mo", fullName: "Иванова Мария Олеговна", roles: ["teacher", "head"] },
@@ -172,6 +270,13 @@ app.get("/report", (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend is running at http://localhost:${PORT}`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Backend is running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("DB init error:", error);
+    process.exit(1);
+  });

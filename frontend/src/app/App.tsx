@@ -1,99 +1,79 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, ConfigProvider, message, Select, Tabs, Typography } from "antd";
+import { Button, ConfigProvider, message, Select, Spin, Tabs, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
-import { teachers } from "../shared/config/teachers";
 import { RoleSelection } from "../features/role-selection/ui/RoleSelection";
+import { ExcelUploadButton } from "../features/excel-upload/ui/ExcelUploadButton";
+import { useExcelDataStore } from "../entities/excel-data/store/excelDataStore";
+import { selectTeacherRowsFromExcel, selectAllTeacherWorkloadsFromExcel } from "../entities/excel-data/lib/selectors";
+import { buildDepartmentReportFromExcel, buildFacultyReportFromExcel } from "../entities/excel-data/lib/reportSelectors";
 import { selectDepartmentWorkloadRows } from "../entities/workload/lib/selectors";
-import { useWorkloadStore } from "../entities/workload/store/workloadStore";
 import { HomePage } from "../pages/home/ui/HomePage";
 import { TeacherWorkloadTable } from "../widgets/teacher-workload-table/ui/TeacherWorkloadTable";
+import { TeacherWorkloadPivotTable } from "../widgets/teacher-workload-table/ui/TeacherWorkloadPivotTable";
 import { HeadDashboard } from "../widgets/head-dashboard/ui/HeadDashboard";
-import { getAllTeacherWorkloads, getDepartmentReport, getTeacherWorkload, saveTeacherWorkload } from "../shared/api/client";
-import { workTypeOptions } from "../shared/config/workloadOptions";
+import { DisciplineAssignmentTable } from "../widgets/discipline-assignment-table/ui/DisciplineAssignmentTable";
+import { FacultyReport } from "../widgets/faculty-report/ui/FacultyReport";
+import { TeacherReferenceReport } from "../widgets/teacher-reference-report/ui/TeacherReferenceReport";
 import { exportToExcel } from "../shared/lib/exportExcel/exportExcel";
-import type { DepartmentReport, TeacherWorkloadListItem } from "../shared/types/workload";
+import type { DepartmentReport, UserMode } from "../shared/types/workload";
 import { PlaneIcon } from "../shared/ui/icon/PlaneIcon";
 import { PageLayout } from "../shared/ui/page-layout/PageLayout";
+import { sortTableData } from "../shared/lib/sortTableData/sortTableData";
 
 export const App = () => {
   const [messageApi, contextHolder] = message.useMessage();
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [report, setReport] = useState<DepartmentReport | null>(null);
-  const [allWorkloads, setAllWorkloads] = useState<TeacherWorkloadListItem[]>([]);
   const [departmentTeacherFilter, setDepartmentTeacherFilter] = useState<string | null>(null);
 
-  const {
-    mode,
-    selectedTeacherId,
-    rows,
-    setMode,
-    setSelectedTeacher,
-    setRows,
-    addRow,
-    addRowFromPrevious,
-    updateRow,
-    deleteRow,
-    resetSession,
-  } = useWorkloadStore();
+  const [mode, setMode] = useState<UserMode | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
 
-  const filteredTeachers = useMemo(
-    () => teachers.filter((teacher) => (mode ? teacher.roles.includes(mode) : true)),
-    [mode]
-  );
-  const headTeachers = useMemo(() => teachers.filter((teacher) => teacher.roles.includes("teacher")), []);
+  const excelState = useExcelDataStore();
 
   useEffect(() => {
-    if (!selectedTeacherId) {
-      return;
-    }
-
-    getTeacherWorkload(selectedTeacherId)
-      .then((response) => setRows(response.rows))
-      .catch(() => messageApi.error("Не удалось загрузить данные преподавателя."));
-  }, [selectedTeacherId, setRows, messageApi]);
+    void excelState.hydrateFromBackend();
+  }, []);
 
   useEffect(() => {
-    if (mode !== "head") {
-      return;
-    }
+    if (!mode) return;
+    if (excelState.initializedFromExcel) return;
+    messageApi.warning("Нет загруженных данных. Загрузите Excel-файл в режиме заведующего кафедрой.");
+  }, [mode, excelState.initializedFromExcel, messageApi]);
 
-    getDepartmentReport()
-      .then(setReport)
-      .catch(() => messageApi.error("Не удалось загрузить отчет кафедры."));
-  }, [mode, selectedTeacherId, rows, messageApi]);
+  const headTeachers = excelState.teachers;
 
-  useEffect(() => {
-    if (mode !== "head") {
-      return;
-    }
+  const allTeacherWorkloads = useMemo(() => selectAllTeacherWorkloadsFromExcel(excelState), [
+    excelState.teachers,
+    excelState.assignments,
+    excelState.workloads,
+  ]);
 
-    getAllTeacherWorkloads()
-      .then(setAllWorkloads)
-      .catch(() => messageApi.error("Не удалось загрузить общую таблицу кафедры."));
-  }, [mode, selectedTeacherId, rows, messageApi]);
+  const departmentRowsAll = useMemo(() => sortTableData(selectDepartmentWorkloadRows(allTeacherWorkloads)), [allTeacherWorkloads]);
 
   const departmentRows = useMemo(() => {
-    const rowsWithTeachers = selectDepartmentWorkloadRows(allWorkloads);
-    if (!departmentTeacherFilter) {
-      return rowsWithTeachers;
-    }
-    return rowsWithTeachers.filter((row) => row.teacherId === departmentTeacherFilter);
-  }, [allWorkloads, departmentTeacherFilter]);
+    if (!departmentTeacherFilter) return departmentRowsAll;
+    return departmentRowsAll.filter((row) => row.teacherId === departmentTeacherFilter);
+  }, [departmentRowsAll, departmentTeacherFilter]);
 
-  const handleSave = async () => {
-    if (!selectedTeacherId) {
-      return;
-    }
-    setSaveLoading(true);
-    try {
-      await saveTeacherWorkload(selectedTeacherId, rows);
-      messageApi.success("Данные успешно сохранены.");
-    } catch {
-      messageApi.error("Ошибка при сохранении данных.");
-    } finally {
-      setSaveLoading(false);
-    }
+  const report: DepartmentReport | null = useMemo(() => {
+    if (!excelState.initializedFromExcel) return null;
+    return buildDepartmentReportFromExcel(excelState);
+  }, [excelState.initializedFromExcel, excelState.workloads, excelState.assignments, excelState.teachers, excelState.workTypes]);
+
+  const facultyReport = useMemo(() => {
+    if (!excelState.initializedFromExcel) return [];
+    return buildFacultyReportFromExcel(excelState);
+  }, [excelState.initializedFromExcel, excelState.workloads]);
+
+  const resetSession = () => {
+    setMode(null);
+    setSelectedTeacherId(null);
+    setDepartmentTeacherFilter(null);
   };
+
+  const teacherRows = useMemo(() => {
+    const rows = selectedTeacherId ? selectTeacherRowsFromExcel(excelState, selectedTeacherId) : [];
+    return sortTableData(rows);
+  }, [excelState.workloads, excelState.assignments, selectedTeacherId]);
 
   const handleExportReport = () => {
     if (!report?.semesterWorkTypeTable.length) {
@@ -103,7 +83,7 @@ export const App = () => {
 
     const columns = [
       { key: "label", title: "Период" },
-      ...workTypeOptions.map((workType) => ({ key: workType as keyof (typeof report.semesterWorkTypeTable)[number]["values"], title: workType })),
+      ...excelState.workTypes.map((workType) => ({ key: workType as keyof (typeof report.semesterWorkTypeTable)[number]["values"], title: workType })),
       { key: "total", title: "ВСЕГО" },
     ];
     const data = report.semesterWorkTypeTable.map((row) => ({
@@ -164,7 +144,13 @@ export const App = () => {
         <main className="app-main">
           {!mode && (
             <div className="app-block app-block-centered">
-              <RoleSelection onSelectRole={setMode} />
+              <RoleSelection
+                onSelectRole={(nextMode) => {
+                  setMode(nextMode);
+                  setSelectedTeacherId(null);
+                  setDepartmentTeacherFilter(null);
+                }}
+              />
             </div>
           )}
 
@@ -178,25 +164,26 @@ export const App = () => {
 
           {mode === "teacher" && (
             <div className="app-block">
-              <HomePage
-                mode={mode}
-                teachers={filteredTeachers}
-                selectedTeacherId={selectedTeacherId}
-                onSelectTeacher={setSelectedTeacher}
-              />
+              {!excelState.initializedFromExcel ? (
+                <Typography.Text>Данные не загружены. Попросите заведующего кафедрой загрузить Excel-файл.</Typography.Text>
+              ) : (
+                <HomePage
+                  mode={mode}
+                  teachers={headTeachers}
+                  selectedTeacherId={selectedTeacherId}
+                  onSelectTeacher={(teacherId) => setSelectedTeacherId(teacherId)}
+                />
+              )}
             </div>
           )}
 
-          {mode === "teacher" && selectedTeacherId && (
+          {mode === "teacher" && excelState.initializedFromExcel && selectedTeacherId && (
             <div className="app-block">
-              <TeacherWorkloadTable
-                rows={rows}
-                onAddRow={addRow}
-                onAddRowFromPrevious={addRowFromPrevious}
-                onDeleteRow={deleteRow}
-                onUpdateRow={updateRow}
-                onSave={handleSave}
-                saveLoading={saveLoading}
+              <TeacherWorkloadPivotTable
+                rows={teacherRows}
+                workTypes={excelState.workTypes}
+                editableActualHours
+                onUpdateActualHours={(id, actualHours) => excelState.updateWorkload(id, { actualHours })}
               />
             </div>
           )}
@@ -204,56 +191,98 @@ export const App = () => {
           {mode === "head" && (
             <>
               <div className="app-block">
-                <HeadDashboard
-                  teachers={headTeachers}
-                  report={report}
-                  selectedTeacherId={selectedTeacherId}
-                  onSelectTeacher={setSelectedTeacher}
-                  onExportReport={handleExportReport}
-                />
+                <ExcelUploadButton />
               </div>
               <div className="app-block">
-                <Tabs
-                  items={[
-                    {
-                      key: "teacher-table",
-                      label: "Таблица преподавателя",
-                      children: selectedTeacherId ? (
-                        <TeacherWorkloadTable rows={rows} editable={false} />
-                      ) : (
-                        <Typography.Text>Выберите преподавателя для просмотра таблицы.</Typography.Text>
-                      ),
-                    },
-                    {
-                      key: "department-table",
-                      label: "Общая таблица кафедры",
-                      children: (
-                        <>
-                          <Select
-                            allowClear
-                            placeholder="Фильтр по преподавателю"
-                            style={{ width: 360, marginBottom: 12 }}
-                            value={departmentTeacherFilter ?? undefined}
-                            options={headTeachers.map((teacher) => ({ value: teacher.id, label: teacher.fullName }))}
-                            onChange={(value) => setDepartmentTeacherFilter(value ?? null)}
-                          />
-                          <TeacherWorkloadTable
-                            rows={departmentRows}
-                            editable={false}
-                            showTeacherColumn
-                            title="Общая таблица кафедры"
-                            extraActions={
-                              <Button icon={<DownloadOutlined />} onClick={handleExportDepartmentTable}>
-                                Скачать Excel
-                              </Button>
-                            }
-                          />
-                        </>
-                      ),
-                    },
-                  ]}
-                />
+                {excelState.initializedFromExcel ? (
+                  <HeadDashboard
+                    teachers={headTeachers}
+                    report={report}
+                    selectedTeacherId={selectedTeacherId}
+                    onSelectTeacher={(teacherId) => setSelectedTeacherId(teacherId)}
+                    workTypes={excelState.workTypes}
+                    onExportReport={handleExportReport}
+                  />
+                ) : (
+                  <Typography.Text>Нет загруженных данных. Загрузите Excel-файл, чтобы начать работу.</Typography.Text>
+                )}
               </div>
+              {excelState.loadingFromBackend && (
+                <div className="app-block">
+                  <Spin />
+                </div>
+              )}
+              {excelState.initializedFromExcel && (
+                <div className="app-block">
+                  <Tabs
+                    items={[
+                      {
+                        key: "teacher-table",
+                        label: "Таблица преподавателя",
+                        children: selectedTeacherId ? (
+                          <TeacherWorkloadPivotTable
+                            rows={teacherRows}
+                            workTypes={excelState.workTypes}
+                            editableActualHours={false}
+                          />
+                        ) : (
+                          <Typography.Text>Выберите преподавателя для просмотра таблицы.</Typography.Text>
+                        ),
+                      },
+                      {
+                        key: "department-table",
+                        label: "Общая таблица кафедры",
+                        children: (
+                          <>
+                            <Select
+                              allowClear
+                              placeholder="Фильтр по преподавателю"
+                              style={{ width: 360, marginBottom: 12 }}
+                              value={departmentTeacherFilter ?? undefined}
+                              options={headTeachers.map((teacher) => ({ value: teacher.id, label: teacher.fullName }))}
+                              onChange={(value) => setDepartmentTeacherFilter(value ?? null)}
+                            />
+                            <TeacherWorkloadTable
+                              rows={departmentRows}
+                              editable
+                              showTeacherColumn
+                              title="Общая таблица кафедры"
+                              onUpdateRow={(id, patch) => excelState.updateWorkload(id, patch)}
+                              extraActions={
+                                <Button icon={<DownloadOutlined />} onClick={handleExportDepartmentTable}>
+                                  Скачать Excel
+                                </Button>
+                              }
+                            />
+                          </>
+                        ),
+                      },
+                      {
+                        key: "discipline-assignment",
+                        label: "Перераспределение дисциплин",
+                        children: (
+                          <DisciplineAssignmentTable
+                            disciplines={excelState.disciplines}
+                            teachers={headTeachers}
+                            assignments={excelState.assignments}
+                            onChangeAssignment={(disciplineId, teacherId) => excelState.updateAssignment(disciplineId, teacherId)}
+                          />
+                        ),
+                      },
+                      {
+                        key: "faculty-report",
+                        label: "Справка по факультетам",
+                        children: <FacultyReport items={facultyReport} />,
+                      },
+                      {
+                        key: "teacher-reference",
+                        label: "Справка по преподавателям",
+                        children: <TeacherReferenceReport rows={departmentRowsAll} />,
+                      },
+                    ]}
+                  />
+                </div>
+              )}
             </>
           )}
         </main>

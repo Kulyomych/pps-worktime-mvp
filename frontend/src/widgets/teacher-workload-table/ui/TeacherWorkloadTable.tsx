@@ -3,7 +3,8 @@ import { Button, Card, Input, InputNumber, Select, Space, Statistic, Table, Typo
 import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, PlusOutlined, SaveOutlined } from "@ant-design/icons";
 import type { WorkloadRow } from "../../../shared/types/workload";
-import { facultyOptions, workTypeOptions } from "../../../shared/config/workloadOptions";
+import { round1 } from "../../../shared/lib/number/round1";
+import { TableFrame } from "../../../shared/ui/table-frame/TableFrame";
 
 type WorkloadTableRow = WorkloadRow & { teacherName?: string };
 
@@ -11,7 +12,10 @@ interface Props {
   rows: WorkloadTableRow[];
   title?: string;
   editable?: boolean;
+  actualHoursOnly?: boolean;
   showTeacherColumn?: boolean;
+  facultyOptions?: string[];
+  workTypeOptions?: string[];
   onAddRow?: () => void;
   onAddRowFromPrevious?: () => void;
   onDeleteRow?: (id: string) => void;
@@ -23,11 +27,42 @@ interface Props {
 
 const numberValue = (value: number | null) => value ?? 0;
 
+const textFilter = <T,>(accessor: (row: T) => string) => ({
+  filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
+    <div style={{ padding: 8, width: 220 }}>
+      <Input
+        value={(selectedKeys[0] as string) ?? ""}
+        placeholder="Фильтр..."
+        onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+        onPressEnter={() => confirm()}
+      />
+      <Space style={{ marginTop: 8 }}>
+        <Button type="primary" size="small" onClick={() => confirm()}>
+          Применить
+        </Button>
+        <Button
+          size="small"
+          onClick={() => {
+            clearFilters?.();
+            confirm();
+          }}
+        >
+          Сброс
+        </Button>
+      </Space>
+    </div>
+  ),
+  onFilter: (value: unknown, record: T) => accessor(record).toLowerCase().includes(String(value).toLowerCase()),
+});
+
 export const TeacherWorkloadTable = ({
   rows,
   title = "Таблица учебной нагрузки",
   editable = true,
+  actualHoursOnly = false,
   showTeacherColumn = false,
+  facultyOptions = [],
+  workTypeOptions = [],
   onAddRow,
   onAddRowFromPrevious,
   onDeleteRow,
@@ -36,6 +71,9 @@ export const TeacherWorkloadTable = ({
   saveLoading,
   extraActions,
 }: Props) => {
+  const canEditStructure = editable && !actualHoursOnly;
+  const canEditActualHours = editable;
+
   const columns: ColumnsType<WorkloadTableRow> = [
     ...(showTeacherColumn
       ? [
@@ -50,9 +88,14 @@ export const TeacherWorkloadTable = ({
       title: "Дисциплина",
       dataIndex: "discipline",
       width: 120,
+      ...textFilter<WorkloadTableRow>((r) => r.discipline),
       render: (_, record) =>
         editable ? (
-          <Input value={record.discipline} onChange={(e) => onUpdateRow?.(record.id, { discipline: e.target.value })} />
+          <Input
+            value={record.discipline}
+            disabled={!canEditStructure}
+            onChange={(e) => canEditStructure && onUpdateRow?.(record.id, { discipline: e.target.value })}
+          />
         ) : (
           record.discipline
         ),
@@ -61,16 +104,18 @@ export const TeacherWorkloadTable = ({
       title: "Семестр",
       dataIndex: "semester",
       width: 90,
+      ...textFilter<WorkloadTableRow>((r) => r.semester),
       render: (_, record) =>
         editable ? (
           <Select
             value={record.semester}
+            disabled={!canEditStructure}
             style={{ width: "100%" }}
             options={[
               { value: "осенний", label: "осенний" },
               { value: "весенний", label: "весенний" },
             ]}
-            onChange={(value) => onUpdateRow?.(record.id, { semester: value })}
+            onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { semester: value })}
           />
         ) : (
           record.semester
@@ -80,14 +125,16 @@ export const TeacherWorkloadTable = ({
       title: "Факультет",
       dataIndex: "faculty",
       width: 95,
+      ...textFilter<WorkloadTableRow>((r) => r.faculty),
       render: (_, record) =>
         editable ? (
           <Select
             value={record.faculty || undefined}
+            disabled={!canEditStructure}
             placeholder="Выберите факультет"
             style={{ width: "100%" }}
             options={facultyOptions.map((value) => ({ value, label: value }))}
-            onChange={(value) => onUpdateRow?.(record.id, { faculty: value })}
+            onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { faculty: value })}
           />
         ) : (
           record.faculty
@@ -97,9 +144,15 @@ export const TeacherWorkloadTable = ({
       title: "Курс",
       dataIndex: "course",
       width: 70,
+      ...textFilter<WorkloadTableRow>((r) => String(r.course ?? "")),
       render: (_, record) =>
         editable ? (
-          <InputNumber min={1} value={record.course} onChange={(value) => onUpdateRow?.(record.id, { course: numberValue(value) })} />
+          <InputNumber
+            min={1}
+            value={record.course}
+            disabled={!canEditStructure}
+            onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { course: numberValue(value) })}
+          />
         ) : (
           record.course
         ),
@@ -108,11 +161,13 @@ export const TeacherWorkloadTable = ({
       title: "Специализация / Профиль",
       dataIndex: "specialization",
       width: 130,
+      ...textFilter<WorkloadTableRow>((r) => r.specialization),
       render: (_, record) =>
         editable ? (
           <Input
             value={record.specialization}
-            onChange={(e) => onUpdateRow?.(record.id, { specialization: e.target.value })}
+            disabled={!canEditStructure}
+            onChange={(e) => canEditStructure && onUpdateRow?.(record.id, { specialization: e.target.value })}
           />
         ) : (
           record.specialization
@@ -127,7 +182,12 @@ export const TeacherWorkloadTable = ({
           width: 80,
           render: (_, record) =>
             editable ? (
-              <InputNumber min={0} value={record.streams} onChange={(value) => onUpdateRow?.(record.id, { streams: numberValue(value) })} />
+              <InputNumber
+                min={0}
+                value={record.streams}
+                disabled={!canEditStructure}
+                onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { streams: numberValue(value) })}
+              />
             ) : (
               record.streams
             ),
@@ -138,7 +198,12 @@ export const TeacherWorkloadTable = ({
           width: 75,
           render: (_, record) =>
             editable ? (
-              <InputNumber min={0} value={record.groups} onChange={(value) => onUpdateRow?.(record.id, { groups: numberValue(value) })} />
+              <InputNumber
+                min={0}
+                value={record.groups}
+                disabled={!canEditStructure}
+                onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { groups: numberValue(value) })}
+              />
             ) : (
               record.groups
             ),
@@ -149,7 +214,12 @@ export const TeacherWorkloadTable = ({
           width: 90,
           render: (_, record) =>
             editable ? (
-              <InputNumber min={0} value={record.students} onChange={(value) => onUpdateRow?.(record.id, { students: numberValue(value) })} />
+              <InputNumber
+                min={0}
+                value={record.students}
+                disabled={!canEditStructure}
+                onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { students: numberValue(value) })}
+              />
             ) : (
               record.students
             ),
@@ -160,14 +230,16 @@ export const TeacherWorkloadTable = ({
       title: "Вид работы",
       dataIndex: "workType",
       width: 130,
+      ...textFilter<WorkloadTableRow>((r) => r.workType),
       render: (_, record) =>
         editable ? (
           <Select
             value={record.workType || undefined}
+            disabled={!canEditStructure}
             placeholder="Выберите вид работы"
             style={{ width: "100%" }}
             options={workTypeOptions.map((value) => ({ value, label: value }))}
-            onChange={(value) => onUpdateRow?.(record.id, { workType: value })}
+            onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { workType: value })}
             showSearch
             optionFilterProp="label"
           />
@@ -179,37 +251,42 @@ export const TeacherWorkloadTable = ({
       title: "Планируемые часы",
       dataIndex: "plannedHours",
       width: 100,
+      ...textFilter<WorkloadTableRow>((r) => String(round1(r.plannedHours))),
       render: (_, record) =>
         editable ? (
           <InputNumber
             min={0}
             value={record.plannedHours}
-            onChange={(value) => onUpdateRow?.(record.id, { plannedHours: numberValue(value) })}
+            disabled={!canEditStructure}
+            onChange={(value) => canEditStructure && onUpdateRow?.(record.id, { plannedHours: round1(numberValue(value)) })}
           />
         ) : (
-          record.plannedHours
+          round1(record.plannedHours)
         ),
     },
     {
       title: "Фактические часы",
       dataIndex: "actualHours",
       width: 100,
+      ...textFilter<WorkloadTableRow>((r) => String(round1(r.actualHours))),
       render: (_, record) =>
         editable ? (
           <InputNumber
             min={0}
             value={record.actualHours}
-            onChange={(value) => onUpdateRow?.(record.id, { actualHours: numberValue(value) })}
+            disabled={!canEditActualHours}
+            onChange={(value) => onUpdateRow?.(record.id, { actualHours: round1(numberValue(value)) })}
           />
         ) : (
-          record.actualHours
+          round1(record.actualHours)
         ),
     },
     {
       title: "Расхождение",
       key: "deviation",
       width: 90,
-      render: (_, record) => record.plannedHours - record.actualHours,
+      ...textFilter<WorkloadTableRow>((r) => String(round1((Number(r.plannedHours) || 0) - (Number(r.actualHours) || 0)))),
+      render: (_, record) => round1((Number(record.plannedHours) || 0) - (Number(record.actualHours) || 0)),
     },
   ];
 
@@ -219,7 +296,7 @@ export const TeacherWorkloadTable = ({
       key: "actions",
       width: 60,
       render: (_, record) => (
-        <Button danger icon={<DeleteOutlined />} onClick={() => onDeleteRow?.(record.id)} />
+        <Button danger disabled={actualHoursOnly} icon={<DeleteOutlined />} onClick={() => onDeleteRow?.(record.id)} />
       ),
     });
   }
@@ -242,13 +319,13 @@ export const TeacherWorkloadTable = ({
 
         {editable && (
           <Space className="teacher-table-toolbar" wrap>
-            <Button type="dashed" icon={<PlusOutlined />} onClick={onAddRow}>
+            <Button type="dashed" disabled={actualHoursOnly} icon={<PlusOutlined />} onClick={onAddRow}>
               Добавить строку
             </Button>
-            <Button type="dashed" onClick={onAddRowFromPrevious}>
+            <Button type="dashed" disabled={actualHoursOnly} onClick={onAddRowFromPrevious}>
               Добавить строку (копировать предыдущую)
             </Button>
-            <Button type="primary" icon={<SaveOutlined />} loading={saveLoading} onClick={onSave}>
+            <Button type="primary" disabled={actualHoursOnly} icon={<SaveOutlined />} loading={saveLoading} onClick={onSave}>
               Сохранить
             </Button>
             {extraActions}
@@ -261,7 +338,7 @@ export const TeacherWorkloadTable = ({
           </Space>
         )}
 
-        <div className="table-responsive">
+        <TableFrame fullscreenTitle={title}>
           <Table
             rowKey="id"
             columns={columns}
@@ -273,12 +350,12 @@ export const TeacherWorkloadTable = ({
             locale={{ emptyText: "Нет данных. Добавьте строку." }}
             bordered
           />
-        </div>
+        </TableFrame>
 
         <Space size="large" wrap>
-          <Statistic title="Сумма планируемых часов" value={totals.planned} />
-          <Statistic title="Сумма фактических часов" value={totals.actual} />
-          <Statistic title="Общее расхождение" value={totals.planned - totals.actual} />
+          <Statistic title="Сумма планируемых часов" value={round1(totals.planned)} />
+          <Statistic title="Сумма фактических часов" value={round1(totals.actual)} />
+          <Statistic title="Общее расхождение" value={round1(totals.planned - totals.actual)} />
         </Space>
       </Space>
     </Card>

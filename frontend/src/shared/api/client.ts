@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { DepartmentReport, TeacherWorkloadListItem, TeacherWorkloadResponse, WorkloadRow } from "../types/workload";
+import type { ExcelDataSnapshot } from "../types/excel";
 
 const api = axios.create({
   baseURL: "http://localhost:4000",
@@ -22,4 +23,13 @@ export const getDepartmentReport = async (): Promise<DepartmentReport> => {
 export const getAllTeacherWorkloads = async (): Promise<TeacherWorkloadListItem[]> => {
   const response = await api.get("/workload");
   return response.data;
+};
+
+export const getExcelState = async (): Promise<ExcelDataSnapshot> => {
+  const response = await api.get("/state");
+  return response.data.state;
+};
+
+export const saveExcelState = async (state: ExcelDataSnapshot): Promise<void> => {
+  await api.put("/state", { state });
 };

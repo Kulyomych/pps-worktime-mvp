@@ -102,6 +102,25 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.table-responsive--fixed {
+  max-height: 62vh;
+  overflow: auto;
+  border: 1px solid #e6eef8;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.table-responsive--fullscreen {
+  max-height: calc(100vh - 170px);
+  overflow: auto;
+}
+
+.table-frame-actions {
+  width: 100%;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .dense-table.ant-table-wrapper,
 .dense-table .ant-spin-nested-loading,
 .dense-table .ant-spin-container,

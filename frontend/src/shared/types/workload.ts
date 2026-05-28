@@ -64,3 +64,16 @@ export interface DepartmentReport {
     values: Record<string, number>;
   }>;
 }
+
+export interface FacultyReportItem {
+  faculty: string;
+  plannedOsen: number;
+  plannedVesen: number;
+  plannedYear: number;
+  actualOsen: number;
+  actualVesen: number;
+  actualYear: number;
+  deviationOsen: number;
+  deviationVesen: number;
+  deviationYear: number;
+}
