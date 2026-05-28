@@ -8,7 +8,7 @@ import type {
 import type { ExcelDataSnapshot } from "../types/excel";
 
 const api = axios.create({
-  baseURL: "http://amvera-Kulyomych17-teacherbackend.amvera.io",
+  baseURL: "http://amvera-kulyomych17-run-teacherbackend.amvera.io",
 });
 
 export const saveTeacherWorkload = async (
