@@ -4,8 +4,9 @@ const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
-const PORT = 4000;
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "..", "data.sqlite");
+const PORT = process.env.PORT || 4000;
+const DB_PATH =
+  process.env.DB_PATH || path.join(__dirname, "..", "data.sqlite");
 
 const db = new sqlite3.Database(DB_PATH);
 
@@ -82,7 +83,7 @@ const saveExcelState = async (state) => {
         data = excluded.data,
         updated_at = excluded.updated_at
     `,
-    [payload, updatedAt]
+    [payload, updatedAt],
   );
 };
 
@@ -91,7 +92,9 @@ app.get("/state", async (_req, res) => {
     const state = (await loadExcelState()) || defaultExcelState;
     return res.json({ state });
   } catch (error) {
-    return res.status(500).json({ message: "Cannot load state from database." });
+    return res
+      .status(500)
+      .json({ message: "Cannot load state from database." });
   }
 });
 
@@ -106,15 +109,47 @@ app.put("/state", async (req, res) => {
 });
 
 const teachers = [
-  { id: "ivanova-mo", fullName: "Иванова Мария Олеговна", roles: ["teacher", "head"] },
-  { id: "babkina-ln", fullName: "Бабкина Людмила Николаевна", roles: ["teacher"] },
-  { id: "ivanchenko-vn", fullName: "Иванченко Вера Николаевна", roles: ["teacher"] },
-  { id: "galuzina-sm", fullName: "Галузина Светлана Михайловна", roles: ["teacher"] },
-  { id: "kuznetsov-vn", fullName: "Кузнецов Владимир Николаевич", roles: ["teacher"] },
+  {
+    id: "ivanova-mo",
+    fullName: "Иванова Мария Олеговна",
+    roles: ["teacher", "head"],
+  },
+  {
+    id: "babkina-ln",
+    fullName: "Бабкина Людмила Николаевна",
+    roles: ["teacher"],
+  },
+  {
+    id: "ivanchenko-vn",
+    fullName: "Иванченко Вера Николаевна",
+    roles: ["teacher"],
+  },
+  {
+    id: "galuzina-sm",
+    fullName: "Галузина Светлана Михайловна",
+    roles: ["teacher"],
+  },
+  {
+    id: "kuznetsov-vn",
+    fullName: "Кузнецов Владимир Николаевич",
+    roles: ["teacher"],
+  },
   { id: "zubov-ay", fullName: "Зубов Анатолий Юрьевич", roles: ["teacher"] },
-  { id: "pyatkova-nn", fullName: "Пяткова Наталья Николаевна", roles: ["teacher"] },
-  { id: "ivanova-vs", fullName: "Иванова Вероника Сергеевна", roles: ["teacher"] },
-  { id: "efimova-av", fullName: "Ефимова Анна Владимировна", roles: ["teacher"] },
+  {
+    id: "pyatkova-nn",
+    fullName: "Пяткова Наталья Николаевна",
+    roles: ["teacher"],
+  },
+  {
+    id: "ivanova-vs",
+    fullName: "Иванова Вероника Сергеевна",
+    roles: ["teacher"],
+  },
+  {
+    id: "efimova-av",
+    fullName: "Ефимова Анна Владимировна",
+    roles: ["teacher"],
+  },
 ];
 
 const workloadByTeacher = {};
@@ -143,7 +178,7 @@ const calculateTeacherTotals = (rows) =>
       acc.actualHours += Number(row.actualHours) || 0;
       return acc;
     },
-    { plannedHours: 0, actualHours: 0 }
+    { plannedHours: 0, actualHours: 0 },
   );
 
 app.get("/teachers", (_req, res) => {
@@ -159,7 +194,11 @@ app.post("/workload", (req, res) => {
 
   workloadByTeacher[teacherId] = rows;
 
-  return res.json({ message: "Workload saved", teacherId, rowsCount: rows.length });
+  return res.json({
+    message: "Workload saved",
+    teacherId,
+    rowsCount: rows.length,
+  });
 });
 
 app.get("/workload/:teacherId", (req, res) => {
@@ -205,7 +244,8 @@ app.get("/report", (_req, res) => {
       actualByWorkType[workType] = (actualByWorkType[workType] || 0) + fact;
 
       if (row.semester === "осенний" || row.semester === "весенний") {
-        bySemester[row.semester][workType] = (bySemester[row.semester][workType] || 0) + fact;
+        bySemester[row.semester][workType] =
+          (bySemester[row.semester][workType] || 0) + fact;
       }
     });
   });
@@ -247,18 +287,24 @@ app.get("/report", (_req, res) => {
   };
 
   const autumnRow = buildRow("осенний", "Осенний семестр", bySemester.осенний);
-  const springRow = buildRow("весенний", "Весенний семестр", bySemester.весенний);
+  const springRow = buildRow(
+    "весенний",
+    "Весенний семестр",
+    bySemester.весенний,
+  );
 
   const yearValues = {};
   reportWorkTypes.forEach((workType) => {
-    yearValues[workType] = (autumnRow.values[workType] || 0) + (springRow.values[workType] || 0);
+    yearValues[workType] =
+      (autumnRow.values[workType] || 0) + (springRow.values[workType] || 0);
   });
   const yearRow = buildRow("год", "Год", yearValues);
   const plannedRow = buildRow("plan", "Плановые часы", plannedByWorkType);
   const actualRow = buildRow("fact", "Фактические часы", actualByWorkType);
   const deviationValues = {};
   reportWorkTypes.forEach((workType) => {
-    deviationValues[workType] = (plannedByWorkType[workType] || 0) - (actualByWorkType[workType] || 0);
+    deviationValues[workType] =
+      (plannedByWorkType[workType] || 0) - (actualByWorkType[workType] || 0);
   });
   const deviationRow = buildRow("deviation", "Расхождение", deviationValues);
 
@@ -266,13 +312,20 @@ app.get("/report", (_req, res) => {
     totals,
     workloadSummary,
     workTypeSummary,
-    semesterWorkTypeTable: [autumnRow, springRow, yearRow, plannedRow, actualRow, deviationRow],
+    semesterWorkTypeTable: [
+      autumnRow,
+      springRow,
+      yearRow,
+      plannedRow,
+      actualRow,
+      deviationRow,
+    ],
   });
 });
 
 initDb()
   .then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`Backend is running at http://localhost:${PORT}`);
     });
   })
