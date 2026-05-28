@@ -4,7 +4,9 @@ meta:
     name: npm
     version: 18
 build:
+  dir: backend
   steps:
     - npm install
 run:
+  dir: backend
   command: npm start
