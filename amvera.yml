@@ -3,10 +3,12 @@ meta:
   toolchain:
     name: npm
     version: 18
+
 build:
-  dir: backend
+  context: backend
   steps:
     - npm install
+
 run:
-  dir: backend
+  context: backend
   command: npm start
